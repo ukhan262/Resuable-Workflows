@@ -1,0 +1,37 @@
+name: Terraform Deployment
+
+on:
+  workflow_call:
+    inputs:
+      tf_workspace_name:
+        description: "Name of the workspaces in terraform cloud or terraform enterprise"
+        required: false
+        type: string
+      tf_version:
+        description: "Version of the terraform"
+        required: true
+        type: string
+    # secrets:
+    #   tf_token:
+    #     description: "Token of terraform cloud or terraform enterprise"
+    #     required: true
+    #   gh_token:
+    #     description: "Token of the GITHUB organization"
+    #     required: true
+  
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "Workspace name is" ${{ inputs.tf_workspace_name }}
+          echo "Terraform Version is" ${{ inputs.tf_version }}
+        shell: bash
+
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          terraform_version: ${{ inputs.tf_version }}
