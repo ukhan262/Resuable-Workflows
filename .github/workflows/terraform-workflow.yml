@@ -11,21 +11,35 @@ on:
         description: "Version of the terraform"
         required: true
         type: string
-    # secrets:
-    #   tf_token:
-    #     description: "Token of terraform cloud or terraform enterprise"
-    #     required: true
-    #   gh_token:
-    #     description: "Token of the GITHUB organization"
-    #     required: true
-  
+      tf_organization: 
+        description: "Name of the TF organization"
+        type: string
+        required: true
+      run_apply:
+        description: "If the code needs to be deployed or not"
+        type: string
+        default: "no"
+      run_destroy:
+        description: "If the resources need to be destroyed or not"
+        type: string
+        default: "no"
+    secrets:
+      tf_token:
+        description: "Token of terraform cloud or terraform enterprise"
+        required: true
+ 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
-  plan:
+  TF_PLAN_APPLY:
     runs-on: ubuntu-latest
     steps:
       - run: |
           echo "Workspace name is" ${{ inputs.tf_workspace_name }}
           echo "Terraform Version is" ${{ inputs.tf_version }}
+          echo "Terraform token is" ${{ secrets.tf_token }}
         shell: bash
 
       - name: Checkout Repository
@@ -35,3 +49,34 @@ jobs:
         uses: hashicorp/setup-terraform@v1
         with:
           terraform_version: ${{ inputs.tf_version }}
+          cli_config_credentials_hostname: "app.terraform.io"
+          cli_config_credentials_token: ${{ secrets.tf_token }}
+      
+      - name: Setup Remote Config Backend
+        run: |
+          cat > config.remote.tfbackend <<EOT
+            workspaces { name = "${{ inputs.tf_workspace_name }}"}
+            hostname = "app.terraform.io"
+            organization = "${{ inputs.tf_organization }}"
+          EOT
+      
+      - name: TF INIT
+        run: |
+          cat config.remote.tfbackend
+          terraform init -backend-config=config.remote.tfbackend
+
+      - name: TF PLAN
+        if: ${{ (inputs.run_destroy == 'no') }}
+        run: |
+          terraform plan
+
+      - name: TF APPLY
+        if: ${{ (inputs.run_apply == 'yes') && (inputs.run_destroy == 'no') }}
+        run: |
+          terraform apply -auto-approve
+
+      - name: TF DESTROY
+        if: ${{ (inputs.run_destroy == 'yes') }}
+        run: |
+          terraform plan -destroy
+          terraform destroy -auto-approve
